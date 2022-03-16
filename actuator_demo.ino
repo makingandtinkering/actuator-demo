@@ -5,10 +5,10 @@
  *  - StepperDriver by Laurentiu Badea
  */
 #include <Arduino.h>
-#include <U8glib.h>
-#include <SimpleRotary.h>
 #include <BasicStepperDriver.h>
 #include <Servo.h>
+#include <SimpleRotary.h>
+#include <U8glib.h>
 
 constexpr uint8_t PIN_SERVO = 1;
 
@@ -71,7 +71,7 @@ void setup() {
   stepper.setEnableActiveState(LOW);
 
   stepper.enable();
-  
+
   pinMode(PIN_PWM, OUTPUT);
 }
 
@@ -84,29 +84,28 @@ void loop() {
 
   if (redraw_lcd && (millis() - last_lcd_redraw) > 200) {
     last_lcd_redraw = millis();
-    u8g.firstPage();  
+    u8g.firstPage();
     do {
-      snprintf(buf, LEN_BUF, "%cServo 1: Pulse=%d", state == STATE_SERVO ? '>':' ', state_servo_data.pulse_width);
+      snprintf(buf, LEN_BUF, "%cServo 1: Pulse=%d", state == STATE_SERVO ? '>' : ' ', state_servo_data.pulse_width);
       u8g.drawStr(0, 8, buf);
 
       snprintf(buf, LEN_BUF, "%cStepper Delta: %d",
-        state == STATE_STEPPER_GRANULARITY ? '>':' ',
-        state_stepper_data.coarse ? state_stepper_data.delta_coarse : state_stepper_data.delta_fine
-      );
+               state == STATE_STEPPER_GRANULARITY ? '>' : ' ',
+               state_stepper_data.coarse ? state_stepper_data.delta_coarse : state_stepper_data.delta_fine);
       u8g.drawStr(0, 20, buf);
-      
-      snprintf(buf, LEN_BUF, "%cStepper X Steps=%d", state == STATE_STEPPER_STEPS ? '>':' ', state_stepper_data.steps);
+
+      snprintf(buf, LEN_BUF, "%cStepper X Steps=%d", state == STATE_STEPPER_STEPS ? '>' : ' ', state_stepper_data.steps);
       u8g.drawStr(0, 28, buf);
 
-      snprintf(buf, LEN_BUF, "%cPWM D10 Duty=%d%", state == STATE_PWM ? '>':' ', state_pwm_data.duty_cycle);
+      snprintf(buf, LEN_BUF, "%cPWM D10 Duty=%d%", state == STATE_PWM ? '>' : ' ', state_pwm_data.duty_cycle);
       u8g.drawStr(0, 44, buf);
-    } while( u8g.nextPage() );
+    } while (u8g.nextPage());
   }
 
   if (rotary.push()) {
-    state = (uint8_t) state + 1;
+    state = (uint8_t)state + 1;
     if (state >= STATE_MAX) {
-      state = (state_t) 0;
+      state = (state_t)0;
     }
 
     redraw_lcd = true;
@@ -114,7 +113,7 @@ void loop() {
 
   uint8_t rotate = rotary.rotate();
   if (rotate) {
-    switch(state) {
+    switch (state) {
       case STATE_SERVO: {
         if (rotate == 1) {
           state_servo_data.pulse_width = min(state_servo_data.pulse_width + state_servo_data.delta, state_servo_data.pulse_max);
@@ -123,7 +122,7 @@ void loop() {
         }
 
         servo.write(state_servo_data.pulse_width);
-    
+
         redraw_lcd = true;
         break;
       }
@@ -143,7 +142,7 @@ void loop() {
             state_stepper_data.steps -= delta;
             stepper.move(-delta);
           }
-  
+
           redraw_lcd = true;
         }
         break;
@@ -156,11 +155,10 @@ void loop() {
         }
 
         analogWrite(PIN_PWM, state_pwm_data.duty_cycle);
-        
+
         redraw_lcd = true;
         break;
       }
     }
   }
-  
 }
