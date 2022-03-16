@@ -2,17 +2,32 @@
  * Library dependencies:
  *  - u8glib
  *  - SimpleRotary
+ *  - StepperDriver by Laurentiu Badea
  */
 #include <Arduino.h>
 #include <U8glib.h>
 #include <SimpleRotary.h>
+#include <BasicStepperDriver.h>
+#include <Servo.h>
+
+constexpr uint8_t PIN_SERVO = 1;
+
+constexpr uint8_t STEPPER_STEPS_PER_REV = 200;
+constexpr uint8_t STEPPER_RPM = 200;
+constexpr uint8_t STEPPER_MICROSTEPS = 16;
+
+// X axis
+constexpr uint8_t PIN_STEPPER_STEP = 54;
+constexpr uint8_t PIN_STEPPER_DIR = 55;
+constexpr uint8_t PIN_STEPPER_EN = 38;
+
+constexpr uint8_t PIN_PWM = 10;
 
 U8GLIB_ST7920_128X64_4X u8g(23, 17, 16);
 SimpleRotary rotary(31, 33, 35);
 
-void setup() {
-  u8g.setFont(u8g_font_profont11);
-}
+BasicStepperDriver stepper(STEPPER_STEPS_PER_REV, PIN_STEPPER_DIR, PIN_STEPPER_STEP, PIN_STEPPER_EN);
+Servo servo;
 
 typedef enum {
   STATE_SERVO = 0,
@@ -46,6 +61,20 @@ struct {
   uint8_t duty_cycle = 0;
 } state_pwm_data;
 
+void setup() {
+  u8g.setFont(u8g_font_profont11);
+
+  servo.attach(PIN_SERVO);
+  servo.write(state_servo_data.pulse_width);
+
+  stepper.begin(STEPPER_RPM, STEPPER_MICROSTEPS);
+  stepper.setEnableActiveState(LOW);
+
+  stepper.enable();
+  
+  pinMode(PIN_PWM, OUTPUT);
+}
+
 void loop() {
   constexpr uint8_t LEN_BUF = 32;
   char buf[LEN_BUF];
@@ -57,7 +86,7 @@ void loop() {
     last_lcd_redraw = millis();
     u8g.firstPage();  
     do {
-      snprintf(buf, LEN_BUF, "%cServo: Pulse=%d", state == STATE_SERVO ? '>':' ', state_servo_data.pulse_width);
+      snprintf(buf, LEN_BUF, "%cServo 1: Pulse=%d", state == STATE_SERVO ? '>':' ', state_servo_data.pulse_width);
       u8g.drawStr(0, 8, buf);
 
       snprintf(buf, LEN_BUF, "%cStepper Delta: %d",
@@ -66,10 +95,10 @@ void loop() {
       );
       u8g.drawStr(0, 20, buf);
       
-      snprintf(buf, LEN_BUF, "%cStepper Steps=%d", state == STATE_STEPPER_STEPS ? '>':' ', state_stepper_data.steps);
+      snprintf(buf, LEN_BUF, "%cStepper X Steps=%d", state == STATE_STEPPER_STEPS ? '>':' ', state_stepper_data.steps);
       u8g.drawStr(0, 28, buf);
 
-      snprintf(buf, LEN_BUF, "%cPWM Duty=%d%", state == STATE_PWM ? '>':' ', state_pwm_data.duty_cycle);
+      snprintf(buf, LEN_BUF, "%cPWM D10 Duty=%d%", state == STATE_PWM ? '>':' ', state_pwm_data.duty_cycle);
       u8g.drawStr(0, 44, buf);
     } while( u8g.nextPage() );
   }
@@ -92,6 +121,8 @@ void loop() {
         } else if (rotate == 2) {
           state_servo_data.pulse_width = max(state_servo_data.pulse_width - state_servo_data.delta, state_servo_data.pulse_min);
         }
+
+        servo.write(state_servo_data.pulse_width);
     
         redraw_lcd = true;
         break;
@@ -103,14 +134,18 @@ void loop() {
         break;
       }
       case STATE_STEPPER_STEPS: {
-        uint8_t delta = state_stepper_data.coarse ? state_stepper_data.delta_coarse : state_stepper_data.delta_fine;
-        if (rotate == 1) {
-          state_stepper_data.steps += delta;
-        } else if (rotate == 2) {
-          state_stepper_data.steps -= delta;
+        if (stepper.getStepsRemaining() == 0) {
+          uint8_t delta = state_stepper_data.coarse ? state_stepper_data.delta_coarse : state_stepper_data.delta_fine;
+          if (rotate == 1) {
+            state_stepper_data.steps += delta;
+            stepper.move(delta);
+          } else if (rotate == 2) {
+            state_stepper_data.steps -= delta;
+            stepper.move(-delta);
+          }
+  
+          redraw_lcd = true;
         }
-
-        redraw_lcd = true;
         break;
       }
       case STATE_PWM: {
@@ -119,6 +154,8 @@ void loop() {
         } else if (rotate == 2) {
           state_pwm_data.duty_cycle = max(state_pwm_data.duty_cycle - state_pwm_data.delta, state_pwm_data.duty_min);
         }
+
+        analogWrite(PIN_PWM, state_pwm_data.duty_cycle);
         
         redraw_lcd = true;
         break;
