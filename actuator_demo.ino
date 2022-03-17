@@ -10,7 +10,7 @@
 #include <SimpleRotary.h>
 #include <U8glib.h>
 
-constexpr uint8_t PIN_SERVO = 1;
+constexpr uint8_t PIN_SERVO = 11;
 
 constexpr uint8_t STEPPER_STEPS_PER_REV = 200;
 constexpr uint8_t STEPPER_RPM = 200;
@@ -41,8 +41,8 @@ state_t state = STATE_SERVO;
 
 struct {
   uint8_t delta = 32;
-  uint16_t pulse_min = 1000;
-  uint16_t pulse_max = 2000;
+  uint16_t pulse_min = 500;
+  uint16_t pulse_max = 2500;
 
   uint16_t pulse_width = 1500;
 } state_servo_data;
@@ -65,7 +65,7 @@ void setup() {
   u8g.setFont(u8g_font_profont11);
 
   servo.attach(PIN_SERVO);
-  servo.write(state_servo_data.pulse_width);
+  servo.writeMicroseconds(state_servo_data.pulse_width);
 
   stepper.begin(STEPPER_RPM, STEPPER_MICROSTEPS);
   stepper.setEnableActiveState(LOW);
@@ -121,7 +121,7 @@ void loop() {
           state_servo_data.pulse_width = max(state_servo_data.pulse_width - state_servo_data.delta, state_servo_data.pulse_min);
         }
 
-        servo.write(state_servo_data.pulse_width);
+        servo.writeMicroseconds(state_servo_data.pulse_width);
 
         redraw_lcd = true;
         break;
